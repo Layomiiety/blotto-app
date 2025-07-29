@@ -67,9 +67,24 @@ def practice_mode():
 
                 if losses.sum() > 0:
                     st.markdown("### 😓 Sample Strategies You Lost Against:")
-                    loss_indices = np.where(losses)[0]
-                    sample_losses = np.random.choice(loss_indices, size=min(5, len(loss_indices)), replace=False)
 
+                    loss_indices = np.where(losses)[0]
+
+                    # Initialize or refresh loss samples
+                    if "sample_losses" not in st.session_state:
+                        st.session_state.sample_losses = np.random.choice(
+                            loss_indices, size=min(5, len(loss_indices)), replace=False
+                        )
+
+                    if st.button("🔁 Show New Loss Examples"):
+                        st.session_state.sample_losses = np.random.choice(
+                            loss_indices, size=min(5, len(loss_indices)), replace=False
+                        )
+                        st.experimental_rerun()
+
+                    sample_losses = st.session_state.sample_losses
+
+                    # Display the selected losses
                     df = pd.DataFrame(strategy_pool[sample_losses], columns=[f"C{i+1}" for i in range(NUM_CASTLES)])
                     df.insert(0, "Strategy Name", strategy_names[sample_losses])
                     df["Opponent Score"] = oppo_total[sample_losses]
@@ -78,11 +93,14 @@ def practice_mode():
 
                     st.markdown("---")
                     st.subheader("🔁 Replay a Lost Match with Animation")
+
                     replay_idx = st.selectbox("Choose a match to replay:", list(range(len(sample_losses))),
-                                              format_func=lambda i: strategy_names[sample_losses[i]])
+                                            format_func=lambda i: strategy_names[sample_losses[i]])
+
                     if st.button("Replay Match"):
                         play_full_match(user_strategy, strategy_pool[sample_losses[replay_idx]],
                                         p1="You", p2=strategy_names[sample_losses[replay_idx]])
+
 
         except ValueError:
             st.error("Invalid input. Please enter only comma-separated integers.")
