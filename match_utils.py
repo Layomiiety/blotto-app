@@ -6,7 +6,7 @@ import time
 NUM_CASTLES = 10
 CASTLE_VALUES = list(range(1, 11))
 
-def animated_soldier_clash_charging(blue_count, red_count, frame_delay=0.2):
+def animated_soldier_clash_charging(blue_count, red_count, frame_delay=0.1):
     container = st.empty()
     i = 0
     while blue_count - i > 0 and red_count - i > 0:
