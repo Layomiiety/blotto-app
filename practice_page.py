@@ -17,7 +17,10 @@ def practice_mode():
     st.title("🎯 Practice Against the Strategy Pool")
     st.markdown("Enter your own strategy and see how it performs against 10,000 opponents!")
 
-    user_input = st.text_input("Enter your strategy as 10 comma-separated integers that sum to 100:")
+    user_input = st.text_input(
+        "Enter your strategy as 10 comma-separated integers that sum to 100:",
+        value=st.session_state.get("user_input", "")
+    )
 
     if user_input:
         try:
@@ -29,9 +32,9 @@ def practice_mode():
             elif np.any(user_strategy < 0):
                 st.error("All numbers must be non-negative.")
             else:
+                st.session_state.user_input = user_input
                 st.success("Valid strategy submitted. Evaluating...")
 
-                # Compare to pool
                 def apply_3strike(you, them):
                     y_score = t_score = streak_y = streak_t = 0
                     for i in range(NUM_CASTLES):
@@ -70,37 +73,47 @@ def practice_mode():
 
                     loss_indices = np.where(losses)[0]
 
-                    # Initialize or refresh loss samples
                     if "sample_losses" not in st.session_state:
                         st.session_state.sample_losses = np.random.choice(
                             loss_indices, size=min(5, len(loss_indices)), replace=False
                         )
 
                     if st.button("🔁 Show New Loss Examples"):
+                        st.session_state.user_input = user_input  # re-store to allow rerun
                         st.session_state.sample_losses = np.random.choice(
                             loss_indices, size=min(5, len(loss_indices)), replace=False
                         )
-                        st.experimental_rerun()
+                        st.rerun()
 
                     sample_losses = st.session_state.sample_losses
+                    true_loss_mask = user_total[sample_losses] < oppo_total[sample_losses]
+                    filtered_losses = np.array(sample_losses)[true_loss_mask]
 
-                    # Display the selected losses
-                    df = pd.DataFrame(strategy_pool[sample_losses], columns=[f"C{i+1}" for i in range(NUM_CASTLES)])
-                    df.insert(0, "Strategy Name", strategy_names[sample_losses])
-                    df["Opponent Score"] = oppo_total[sample_losses]
-                    df["Your Score"] = user_total[sample_losses]
-                    st.dataframe(df)
+                    if len(filtered_losses) == 0:
+                        st.warning("All samples turned out to be ties or wins. Try reloading.")
+                    else:
+                        df = pd.DataFrame(strategy_pool[filtered_losses], columns=[f"C{i+1}" for i in range(NUM_CASTLES)])
+                        df.insert(0, "Strategy Name", strategy_names[filtered_losses])
+                        df["Opponent Score"] = oppo_total[filtered_losses]
+                        df["Your Score"] = user_total[filtered_losses]
+                        st.dataframe(df)
 
-                    st.markdown("---")
-                    st.subheader("🔁 Replay a Lost Match with Animation")
+                        st.markdown("---")
+                        st.subheader("🔁 Replay a Lost Match with Animation")
 
-                    replay_idx = st.selectbox("Choose a match to replay:", list(range(len(sample_losses))),
-                                            format_func=lambda i: strategy_names[sample_losses[i]])
+                        replay_idx = st.selectbox(
+                            "Choose a match to replay:",
+                            list(range(len(filtered_losses))),
+                            format_func=lambda i: strategy_names[filtered_losses[i]]
+                        )
 
-                    if st.button("Replay Match"):
-                        play_full_match(user_strategy, strategy_pool[sample_losses[replay_idx]],
-                                        p1="You", p2=strategy_names[sample_losses[replay_idx]])
-
+                        if st.button("Replay Match"):
+                            play_full_match(
+                                user_strategy,
+                                strategy_pool[filtered_losses[replay_idx]],
+                                p1="You",
+                                p2=strategy_names[filtered_losses[replay_idx]]
+                            )
 
         except ValueError:
             st.error("Invalid input. Please enter only comma-separated integers.")
